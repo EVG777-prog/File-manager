@@ -1,7 +1,6 @@
 import readline from 'readline';
 import path from 'path';
 import fs from 'fs';
-import fsPromises from 'fs';
 import { __dirname, __filename } from './const.js';
 import { list } from './list.js';
 import { readFile } from './readFile.js';
@@ -28,7 +27,7 @@ const rl = readline.createInterface({
 // const stats = fs.stat();
 
 export const startReadLine = async () => {
-  let filePath, newFilePath, tempDirectory, tempData;
+  let filePath, newFilePath, tempDirectory, tempData, argsArray;
 
   showCurrentDirectory();
   
@@ -36,13 +35,29 @@ export const startReadLine = async () => {
     const arrayCommandAndArgs = input.split(' ');
     const command = arrayCommandAndArgs[0];
     const args = arrayCommandAndArgs.slice(1).join(' ');
+
+    if (args.includes('"')) {
+      argsArray = args.split('"').map((item) => item.trim()).filter((item) => item !== '');
+    } else {
+      argsArray = args.split(' ').map((item) => item.trim()).filter((item) => item !== '');
+    }
   
     switch (command) {
       case 'os':
-        getInfoOs(args);
+        if (argsArray.length !== 1) {
+          console.error(INVALID_INPUT);
+          showCurrentDirectory();
+          break;
+        }
+        getInfoOs(argsArray[0]);
         break;
       case 'cd':
-        tempDirectory = getFilePath(args);
+        if (argsArray.length !== 1) {
+          console.error(INVALID_INPUT);
+          showCurrentDirectory();
+          break;
+        }
+        tempDirectory = getFilePath(argsArray[0]);
         fs.access(tempDirectory, fs.constants.F_OK, (err) => {
           if (err) {
             console.error(OPERATION_FAILED);
@@ -54,7 +69,12 @@ export const startReadLine = async () => {
         });
         break;
       case 'rm':
-        filePath = getFilePath(args);
+        if (argsArray.length !== 1) {
+          console.error(INVALID_INPUT);
+          showCurrentDirectory();
+          break;
+        }
+        filePath = getFilePath(argsArray[0]);
         fs.access(filePath, fs.constants.F_OK, (err) => {
           if (err) {
             console.error(OPERATION_FAILED);
@@ -65,14 +85,13 @@ export const startReadLine = async () => {
         });
         break;
       case 'rn':
-        tempData = args.split(' ');
-        if (tempData.length !== 2) {
+        if (argsArray.length !== 2) {
           console.error(INVALID_INPUT);
           showCurrentDirectory();
           break;
         }
-        filePath = path.join(currentDirectory, tempData[0]);
-        newFilePath = path.join(currentDirectory, tempData[1]);
+        filePath = getFilePath(argsArray[0]);
+        newFilePath = getFilePath(argsArray[1]);
         fs.access(filePath, fs.constants.F_OK, (err) => {
           if (err) {
             console.error(OPERATION_FAILED);
@@ -83,48 +102,65 @@ export const startReadLine = async () => {
         });
         break;
       case 'mv':
-        filePath = path.join(currentDirectory, args.split(' ')[0]);
-        newFilePath = path.join(currentDirectory, args.split(' ')[1], path.basename(filePath));
-        moveFile(filePath, newFilePath);
-        break;
-      case 'cp':
-        tempData = args.split(' ');
-        if (tempData.length !== 2) {
+        if (argsArray.length !== 2) {
           console.error(INVALID_INPUT);
           showCurrentDirectory();
           break;
         }
-        filePath = getFilePath(tempData[0]);
-        newFilePath = getFilePath(tempData[1]);
-        console.log(filePath, newFilePath);
-        fs.lstat(newFilePath, (err, stats) => {
+        filePath = getFilePath(argsArray[0]);
+        newFilePath = getFilePath(argsArray[1]);
+        fs.access(newFilePath, fs.constants.F_OK, (err) => {
           if (err) {
             console.error(OPERATION_FAILED);
             showCurrentDirectory();
           } else {
-            if (stats.isDirectory()) {
-              newFilePath = path.join(newFilePath, path.basename(filePath)) ;
-            }
-            fs.access(filePath, fs.constants.F_OK, (err) => {
-              if (err) {
-                console.error(OPERATION_FAILED);
-                showCurrentDirectory();
-              } else {
-                console.log('Args: ');
-                console.log(filePath, newFilePath);
-                copyFile(filePath, newFilePath);
-              }
-            });
+            newFilePath = path.join(newFilePath, path.basename(filePath));
+            moveFile(filePath, newFilePath);
           }
+        });
+        moveFile(filePath, newFilePath);
+        break;
+      case 'cp':
+        if (argsArray.length !== 2) {
+          console.error(INVALID_INPUT);
+          showCurrentDirectory();
+          break;
+        }
+        filePath = getFilePath(argsArray[0]);
+        newFilePath = getFilePath(argsArray[1]);
+        fs.lstat(newFilePath, (err, stats) => {
+          if (!err && stats.isDirectory()) {
+              newFilePath = path.join(newFilePath, path.basename(filePath)) ;
+          }
+          fs.access(filePath, fs.constants.F_OK, (err) => {
+            if (err) {
+              console.error(OPERATION_FAILED);
+              showCurrentDirectory();
+            } else {
+              console.log('Args: ');
+              console.log(filePath, newFilePath);
+              copyFile(filePath, newFilePath);
+            }
+          });
         });
         break;
       case 'add':
-        filePath = getFilePath(args);
+        if (argsArray.length !== 1) {
+          console.error(INVALID_INPUT);
+          showCurrentDirectory();
+          break;
+        }
+        filePath = getFilePath(argsArray[0]);
         console.log(`You chose add file ${filePath}`);
         createFile(filePath);
         break;
       case 'cat':
-        filePath = getFilePath(args);
+        if (argsArray.length !== 1) {
+          console.error(INVALID_INPUT);
+          showCurrentDirectory();
+          break;
+        }
+        filePath = getFilePath(argsArray[0]);
         readFile(filePath);
         break;
       case 'ls':
@@ -135,17 +171,32 @@ export const startReadLine = async () => {
         showCurrentDirectory();
         break;
       case 'hash':
-        filePath = getFilePath(args);
+        if (argsArray.length !== 1) {
+          console.error(INVALID_INPUT);
+          showCurrentDirectory();
+          break;
+        }
+        filePath = getFilePath(argsArray[0]);
         hashFile(filePath);
         break;
       case 'compress':
-        filePath = path.join(currentDirectory, args.split(' ')[0]);
-        newFilePath = path.join(currentDirectory, args.split(' ')[1], path.parse(filePath).base + '.br');
+        if (argsArray.length !== 2) {
+          console.error(INVALID_INPUT);
+          showCurrentDirectory();
+          break;
+        }
+        filePath = getFilePath(argsArray[0]);
+        newFilePath = path.join(getFilePath(argsArray[1]), path.parse(filePath).base + '.br');
         compress(filePath, newFilePath);
         break;
       case 'decompress':
-        filePath = path.join(currentDirectory, args.split(' ')[0]);
-        newFilePath = path.join(currentDirectory, args.split(' ')[1], path.parse(filePath).name);
+        if (argsArray.length !== 2) {
+          console.error(INVALID_INPUT);
+          showCurrentDirectory();
+          break;
+        }
+        filePath = getFilePath(argsArray[0]);
+        newFilePath = path.join(getFilePath(argsArray[1]), path.parse(filePath).name);
         decompress(filePath, newFilePath);
         break;
       case '.exit':
